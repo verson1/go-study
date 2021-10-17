@@ -1,38 +1,52 @@
 package mongondb
 
 import (
-	"fmt"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"context"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 	"time"
 )
 
-type mogConn struct {
-	session *mgo.Session
+type mgoConn struct {
+	client *mongo.Client
 }
 
-func NewConnection() (MgoApi, error) {
-	session, err := mgo.DialWithInfo(&mgo.DialInfo{
-		Addrs:    []string{"127.0.0.1:27017"},
-		Username: "admin",
-		Password: "123456",
-		Timeout:  time.Second * 30,
-	})
+func (m mgoConn) GetClient() *mongo.Client {
+	return m.client
+}
+
+func (m mgoConn) GetDB(dbName string) *mongo.Database {
+	return m.client.Database(dbName)
+}
+
+func (m mgoConn) Close() {
+	err := m.client.Disconnect(context.TODO())
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	log.Println("Connection to MongoDB closed.")
+}
+
+func NewConnection(opt ...Option) (MgoConnect, error) {
+	opts := &Options{}
+	for _, o := range opt {
+		o(opts)
 	}
 
-	return &mogConn{session: session}, nil
-}
-
-func (m *mogConn) GetSession() *mgo.Session {
-	return m.session
-}
-
-func (m *mogConn) GetDB(dbName string) *mgo.Database {
-	return m.session.DB(dbName)
-}
-
-func (m *mogConn) Close() {
-	m.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx,
+		options.Client().ApplyURI(opts.URI).
+			SetAuth(options.Credential{
+				AuthMechanism: opts.Mechanism,
+				AuthSource:    opts.Database,
+				Username:      opts.Username,
+				Password:      opts.Password,
+			}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &mgoConn{client: client}, nil
 }

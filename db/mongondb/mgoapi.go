@@ -1,9 +1,11 @@
 package mongondb
 
-import "gopkg.in/mgo.v2"
+import (
+	"go.mongodb.org/mongo-driver/mongo"
+)
 
-type MgoApi interface {
-	GetSession() *mgo.Session
-	GetDB(dbName string) *mgo.Database
+type MgoConnect interface {
+	GetClient() *mongo.Client
+	GetDB(dbName string) *mongo.Database
 	Close()
 }
